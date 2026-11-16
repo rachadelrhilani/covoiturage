@@ -1,13 +1,13 @@
 package com.covoiturage.covoiturage_api.entity;
 
-import com.covoiturage.enums.StatutReservation;
-import com.covoiturage.enums.StatutTrajet;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.covoiturage.covoiturage_api.enums.StatutTrajet;
 
 @Entity
 @Table(name = "trajets")
