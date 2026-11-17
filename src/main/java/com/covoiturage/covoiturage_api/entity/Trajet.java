@@ -1,5 +1,6 @@
 package com.covoiturage.covoiturage_api.entity;
 
+import com.covoiturage.covoiturage_api.enums.StatutReservation;
 import com.covoiturage.covoiturage_api.enums.StatutTrajet;
 import jakarta.persistence.*;
 import lombok.*;
@@ -52,7 +53,7 @@ public class Trajet {
     @Builder.Default
     private List<Reservation> reservations = new ArrayList<>();
 
-    /* public void addPointArret(PointArret point) {
+    public void addPointArret(PointArret point) {
         pointsArret.add(point);
         point.setTrajet(this);
     }
@@ -63,5 +64,5 @@ public class Trajet {
                 .mapToInt(Reservation::getNbrPlaces)
                 .sum();
         return placesPropose - placesReservees;
-    } */
+    }
 }
