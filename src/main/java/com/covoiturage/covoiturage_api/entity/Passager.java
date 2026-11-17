@@ -9,7 +9,7 @@ import java.util.List;
 @Entity
 @Table(name = "passagers")
 @Getter @Setter
-@NoArgsConstructor @AllArgsConstructor 
+@NoArgsConstructor @AllArgsConstructor
 @Builder
 public class Passager {
 

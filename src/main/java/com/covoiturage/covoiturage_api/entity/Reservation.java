@@ -1,11 +1,11 @@
 package com.covoiturage.covoiturage_api.entity;
+
+import com.covoiturage.covoiturage_api.enums.StatutReservation;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
-import com.covoiturage.covoiturage_api.enums.StatutReservation;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "reservations")
@@ -18,14 +18,20 @@ public class Reservation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "nombre_places", nullable = false)
-    private Integer nombrePlaces;
+    @Column(name = "nbr_places", nullable = false)
+    private Integer nbrPlaces;
 
     @Column(name = "montant_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal montantTotal;
 
     @Column(name = "date_reservation", nullable = false)
-    private LocalDateTime dateReservation;
+    private LocalDate dateReservation;
+
+    @Column(name = "ville_montee", nullable = false)
+    private String villeMontee;
+
+    @Column(name = "ville_descente", nullable = false)
+    private String villeDescente;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -38,12 +44,4 @@ public class Reservation {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "trajet_id", nullable = false)
     private Trajet trajet;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "point_montee_id", nullable = false)
-    private PointArret pointMontee;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "point_descente_id", nullable = false)
-    private PointArret pointDescente;
 }

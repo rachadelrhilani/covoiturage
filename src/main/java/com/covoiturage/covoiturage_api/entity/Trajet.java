@@ -1,13 +1,12 @@
 package com.covoiturage.covoiturage_api.entity;
 
+import com.covoiturage.covoiturage_api.enums.StatutTrajet;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.covoiturage.covoiturage_api.enums.StatutTrajet;
 
 @Entity
 @Table(name = "trajets")
@@ -29,8 +28,8 @@ public class Trajet {
     @Column(name = "date_depart", nullable = false)
     private LocalDateTime dateDepart;
 
-    @Column(name = "places_proposees", nullable = false)
-    private Integer placesProposees;
+    @Column(name = "places_propose", nullable = false)
+    private Integer placesPropose;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -53,16 +52,16 @@ public class Trajet {
     @Builder.Default
     private List<Reservation> reservations = new ArrayList<>();
 
-    // public void addPointArret(PointArret point) {
-    //     pointsArret.add(point);
-    //     point.setTrajet(this);
-    // }
+    /* public void addPointArret(PointArret point) {
+        pointsArret.add(point);
+        point.setTrajet(this);
+    }
 
-    // public int calculerPlacesRestantes() {
-    //     int placesReservees = reservations.stream()
-    //             .filter(r -> r.getStatut() == StatutReservation.CONFIRMEE)
-    //             .mapToInt(Reservation::getNombrePlaces)
-    //             .sum();
-    //     return placesProposees - placesReservees;
-    // }
+    public int calculerPlacesRestantes() {
+        int placesReservees = reservations.stream()
+                .filter(r -> r.getStatut() == StatutReservation.CONFIRMEE)
+                .mapToInt(Reservation::getNbrPlaces)
+                .sum();
+        return placesPropose - placesReservees;
+    } */
 }

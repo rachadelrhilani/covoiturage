@@ -23,11 +23,11 @@ public class PointArret {
     @Column(nullable = false)
     private Integer ordre;
 
-    @Column(name = "heure_passage", nullable = false)
-    private LocalDateTime heurePassage;
+    @Column(name = "heure_de_passage", nullable = false)
+    private LocalDateTime heureDePassage;
 
-    @Column(name = "prix_depuis_depart", nullable = false, precision = 10, scale = 2)
-    private BigDecimal prixDepuisDepart;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal prix;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "trajet_id", nullable = false)
