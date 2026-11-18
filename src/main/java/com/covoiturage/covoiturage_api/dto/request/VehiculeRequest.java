@@ -15,6 +15,9 @@ public record VehiculeRequest(
         @NotBlank(message = "L'immatriculation est obligatoire")
         String immatriculation,
 
+        @NotBlank(message = "la couleur est obligatoire")
+        String couleur,
+
         @NotNull(message = "La capacité est obligatoire")
         @Min(value = 1, message = "La capacité minimale est de 1 place passager")
         @Max(value = 8, message = "La capacité maximale est de 8 places passagers")

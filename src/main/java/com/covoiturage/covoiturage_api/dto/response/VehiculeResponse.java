@@ -5,6 +5,7 @@ public record VehiculeResponse(
         String marque,
         String modele,
         String immatriculation,
+        String couleur,
         Integer capacite,
         Long conducteurId,
         String conducteurNomComplet

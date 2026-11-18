@@ -26,6 +26,9 @@ public class Vehicule {
     @Column(nullable = false)
     private Integer capacite;
 
+    @Column(nullable = false)
+    private String couleur;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "conducteur_id", nullable = false)
     private Conducteur conducteur;
