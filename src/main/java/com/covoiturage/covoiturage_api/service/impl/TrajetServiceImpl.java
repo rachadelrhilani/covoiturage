@@ -8,7 +8,6 @@ import com.covoiturage.covoiturage_api.entity.Conducteur;
 import com.covoiturage.covoiturage_api.entity.PointArret;
 import com.covoiturage.covoiturage_api.entity.Trajet;
 import com.covoiturage.covoiturage_api.entity.Vehicule;
-import com.covoiturage.covoiturage_api.enums.StatutReservation;
 import com.covoiturage.covoiturage_api.enums.StatutTrajet;
 import com.covoiturage.covoiturage_api.exception.AccessDeniedActionException;
 import com.covoiturage.covoiturage_api.exception.BadRequestException;
@@ -55,35 +54,24 @@ public class TrajetServiceImpl implements TrajetService {
     @Transactional
     public TrajetResponse publierTrajet(TrajetRequest request) {
         Conducteur conducteur = conducteurRepository.findById(request.conducteurId())
-                .orElseThrow(() -> {
-                    log.warn("Publication trajet refusée : conducteur introuvable id={}", request.conducteurId());
-                    return new ResourceNotFoundException("Conducteur introuvable avec l'identifiant : " + request.conducteurId());
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Conducteur introuvable : " + request.conducteurId()));
 
         Vehicule vehicule = vehiculeRepository.findDetailById(request.vehiculeId())
-                .orElseThrow(() -> {
-                    log.warn("Publication trajet refusée : véhicule introuvable id={}", request.vehiculeId());
-                    return new ResourceNotFoundException("Véhicule introuvable avec l'identifiant : " + request.vehiculeId());
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Véhicule introuvable : " + request.vehiculeId()));
 
-        // Règle : Le conducteur publie uniquement avec l'un de ses propres véhicules (403)
         if (!vehicule.getConducteur().getId().equals(conducteur.getId())) {
-            log.warn("Publication trajet refusée : véhicule {} n'appartient pas au conducteur {}",
-                    vehicule.getId(), conducteur.getId());
-            throw new AccessDeniedActionException("Vous ne pouvez publier un trajet qu'avec l'un de vos propres véhicules.");
+            log.warn("Véhicule {} n'appartient pas au conducteur {}", vehicule.getId(), conducteur.getId());
+            throw new AccessDeniedActionException("Vous ne pouvez utiliser que vos propres véhicules.");
         }
 
-        
         if (request.placesPropose() < 1 || request.placesPropose() > vehicule.getCapacite()) {
-            log.warn("Publication trajet refusée : {} places proposées pour une capacité de {}",
-                    request.placesPropose(), vehicule.getCapacite());
-            throw new BadRequestException("Le nombre de places proposées doit être compris entre 1 et " + vehicule.getCapacite() + " (capacité du véhicule).");
+            log.warn("Places proposées ({}) invalides pour capacité ({})", request.placesPropose(), vehicule.getCapacite());
+            throw new BadRequestException("Places proposées invalides (max : " + vehicule.getCapacite() + ").");
         }
 
-        List<PointArretRequest> pointsOrdonnes = validerEtTrierPointsArret(request.pointsArret());
-
-        PointArretRequest depart = pointsOrdonnes.get(0);
-        PointArretRequest arrivee = pointsOrdonnes.get(pointsOrdonnes.size() - 1);
+        List<PointArretRequest> points = validerEtTrierPointsArret(request.pointsArret());
+        PointArretRequest depart = points.get(0);
+        PointArretRequest arrivee = points.get(points.size() - 1);
 
         Trajet trajet = Trajet.builder()
                 .villeDepart(depart.ville().trim())
@@ -95,15 +83,14 @@ public class TrajetServiceImpl implements TrajetService {
                 .vehicule(vehicule)
                 .build();
 
-        pointsOrdonnes.forEach(pReq -> {
-            PointArret point = pointArretMapper.toEntity(pReq);
-            point.setVille(pReq.ville().trim());
+        points.forEach(p -> {
+            PointArret point = pointArretMapper.toEntity(p);
+            point.setVille(p.ville().trim());
             trajet.addPointArret(point);
         });
 
         Trajet saved = trajetRepository.save(trajet);
-        log.info("Trajet publié avec succès : id={}, {} -> {}, conducteurId={}, places={}",
-                saved.getId(), saved.getVilleDepart(), saved.getVilleArrivee(), conducteur.getId(), saved.getPlacesPropose());
+        log.info("Trajet publié : id={}, {} -> {}", saved.getId(), saved.getVilleDepart(), saved.getVilleArrivee());
 
         return trajetMapper.toResponse(saved);
     }
@@ -127,8 +114,10 @@ public class TrajetServiceImpl implements TrajetService {
                 });
 
         if (!trajet.getConducteur().getId().equals(conducteurId)) {
-            log.warn("Consultation réservations trajet {} refusée : conducteur {} non propriétaire", trajetId, conducteurId);
-            throw new AccessDeniedActionException("Vous ne pouvez consulter que les réservations de vos propres trajets.");
+            log.warn("Consultation réservations trajet {} refusée : conducteur {} non propriétaire", trajetId,
+                    conducteurId);
+            throw new AccessDeniedActionException(
+                    "Vous ne pouvez consulter que les réservations de vos propres trajets.");
         }
 
         return reservationRepository.findByTrajetId(trajetId).stream()
@@ -138,61 +127,54 @@ public class TrajetServiceImpl implements TrajetService {
 
     private List<PointArretRequest> validerEtTrierPointsArret(List<PointArretRequest> points) {
         if (points == null || points.size() < 2) {
-            throw new BadRequestException("Un trajet doit contenir au moins deux points d'arrêt (départ et arrivée).");
+            throw new BadRequestException("Il faut au moins 2 points d'arrêt (départ et arrivée).");
         }
 
         List<PointArretRequest> sorted = points.stream()
                 .sorted(Comparator.comparingInt(PointArretRequest::ordre))
                 .toList();
 
-        for (int i = 0; i < sorted.size(); i++) {
-            if (sorted.get(i).ordre() != i) {
-                throw new BadRequestException("Les ordres des points d'arrêt doivent être séquentiels à partir de 0 (0, 1, 2...).");
-            }
+        PointArretRequest depart = sorted.get(0);
+
+        if (!depart.heureDePassage().isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("La date de départ doit être dans le futur.");
         }
 
-        PointArretRequest premierPoint = sorted.get(0);
-        if (!premierPoint.heureDePassage().isAfter(LocalDateTime.now())) {
-            log.warn("Publication trajet refusée : heure de départ dans le passé ({})", premierPoint.heureDePassage());
-            throw new BadRequestException("L'heure de départ du trajet doit être dans le futur.");
+        if (depart.prix().compareTo(BigDecimal.ZERO) != 0) {
+            throw new BadRequestException("Le prix au point de départ doit être égal à 0.");
         }
 
-        if (premierPoint.prix().compareTo(BigDecimal.ZERO) != 0) {
-            log.warn("Publication trajet refusée : prix initial différent de 0 ({})", premierPoint.prix());
-            throw new BadRequestException("Le prix depuis le départ doit être égal à 0 au premier point d'arrêt.");
-        }
-
-        Set<String> villesVues = new HashSet<>();
-        villesVues.add(premierPoint.ville().trim().toLowerCase());
-
-        for (int i = 1; i < sorted.size(); i++) {
-            PointArretRequest precedent = sorted.get(i - 1);
-            PointArretRequest courant = sorted.get(i);
-
-            String villeNormalisee = courant.ville().trim().toLowerCase();
-            if (!villesVues.add(villeNormalisee)) {
-                log.warn("Publication trajet refusée : ville en doublon sur le parcours ({})", courant.ville());
-                throw new BadRequestException("La ville '" + courant.ville() + "' apparaît plusieurs fois sur le parcours.");
-            }
-
-            if (!courant.heureDePassage().isAfter(precedent.heureDePassage())) {
-                log.warn("Publication trajet refusée : heures de passage non croissantes entre {} et {}",
-                        precedent.ville(), courant.ville());
-                throw new BadRequestException("Les heures de passage doivent être strictement croissantes entre '"
-                        + precedent.ville() + "' et '" + courant.ville() + "'.");
-            }
-
-            if (courant.prix().compareTo(precedent.prix()) <= 0) {
-                log.warn("Publication trajet refusée : prix non croissants entre {} ({}) et {} ({})",
-                        precedent.ville(), precedent.prix(), courant.ville(), courant.prix());
-                throw new BadRequestException("Le prix depuis le départ doit être strictement croissant entre '"
-                        + precedent.ville() + "' et '" + courant.ville() + "'.");
-            }
-        }
-
+        verifierProgressionEtapes(sorted);
         return sorted;
     }
 
+    private void verifierProgressionEtapes(List<PointArretRequest> sorted) {
+        Set<String> villes = new HashSet<>();
+
+        for (int i = 0; i < sorted.size(); i++) {
+            PointArretRequest courant = sorted.get(i);
+
+            if (courant.ordre() != i) {
+                throw new BadRequestException("L'ordre des points doit être séquentiel (0, 1, 2...).");
+            }
+
+            if (!villes.add(courant.ville().trim().toLowerCase())) {
+                throw new BadRequestException("Ville en doublon : " + courant.ville());
+            }
+
+            if (i > 0) {
+                PointArretRequest precedent = sorted.get(i - 1);
+
+                if (!courant.heureDePassage().isAfter(precedent.heureDePassage())) {
+                    throw new BadRequestException("Les heures de passage doivent être croissantes.");
+                }
+
+                if (courant.prix().compareTo(precedent.prix()) <= 0) {
+                    throw new BadRequestException("Les prix depuis le départ doivent être croissants.");
+                }
+            }
+        }
+    }
 
     @Override
     public Page<TrajetResponse> rechercherTrajets(
@@ -204,38 +186,36 @@ public class TrajetServiceImpl implements TrajetService {
             Pageable pageable) {
 
         int placesDemandees = (nbPlaces != null && nbPlaces > 0) ? nbPlaces : 1;
-        LocalDateTime debutJour = date.atStartOfDay();
-        LocalDateTime finJour = date.plusDays(1).atStartOfDay();
+        String depart = villeDepart.trim();
+        String arrivee = villeArrivee.trim();
 
         log.info("Recherche de trajets : {} -> {} le {} (places >= {}, prixMax={})",
-                villeDepart, villeArrivee, date, placesDemandees, prixMax);
+                depart, arrivee, date, placesDemandees, prixMax);
 
         Page<Trajet> trajetsPage = trajetRepository.searchTrajets(
-                villeDepart.trim(),
-                villeArrivee.trim(),
-                debutJour,
-                finJour,
+                depart,
+                arrivee,
+                date,
                 prixMax,
                 placesDemandees,
-                StatutTrajet.PUBLIE,
-                StatutReservation.CONFIRMEE,
-                pageable
-        );
+                pageable);
 
         return trajetsPage.map(trajet -> {
             BigDecimal prixMontee = trajet.getPointsArret().stream()
-                    .filter(p -> p.getVille().equalsIgnoreCase(villeDepart.trim()))
+                    .filter(p -> p.getVille().equalsIgnoreCase(depart))
                     .map(PointArret::getPrix)
                     .findFirst()
                     .orElse(BigDecimal.ZERO);
 
             BigDecimal prixDescente = trajet.getPointsArret().stream()
-                    .filter(p -> p.getVille().equalsIgnoreCase(villeArrivee.trim()))
+                    .filter(p -> p.getVille().equalsIgnoreCase(arrivee))
                     .map(PointArret::getPrix)
                     .findFirst()
                     .orElse(BigDecimal.ZERO);
 
-            BigDecimal prixSegment = prixDescente.subtract(prixMontee).setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal prixSegment = prixDescente.subtract(prixMontee)
+                    .setScale(2, java.math.RoundingMode.HALF_UP);
+
             return trajetMapper.toResponseWithSegmentPrice(trajet, prixSegment);
         });
     }

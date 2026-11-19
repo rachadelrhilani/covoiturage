@@ -10,10 +10,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -49,13 +54,14 @@ public class TrajetController {
     public ResponseEntity<Page<TrajetResponse>> rechercherTrajets(
             @RequestParam String villeDepart,
             @RequestParam String villeArrivee,
-            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
-            @RequestParam(required = false) java.math.BigDecimal prixMax,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) BigDecimal prixMax,
             @RequestParam(defaultValue = "1") Integer nbPlaces,
-            @org.springframework.data.web.PageableDefault(size = 10, sort = "dateDepart") org.springframework.data.domain.Pageable pageable) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
+        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(
-                trajetService.rechercherTrajets(villeDepart, villeArrivee, date, prixMax, nbPlaces, pageable)
-        );
+                trajetService.rechercherTrajets(villeDepart, villeArrivee, date, prixMax, nbPlaces, pageable));
     }
 }
