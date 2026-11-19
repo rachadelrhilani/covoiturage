@@ -68,7 +68,7 @@ public class TrajetServiceImpl implements TrajetService {
             throw new AccessDeniedActionException("Vous ne pouvez publier un trajet qu'avec l'un de vos propres véhicules.");
         }
 
-        // Règle : Les places proposées vont de 1 à la capacité du véhicule (400)
+        
         if (request.placesPropose() < 1 || request.placesPropose() > vehicule.getCapacite()) {
             log.warn("Publication trajet refusée : {} places proposées pour une capacité de {}",
                     request.placesPropose(), vehicule.getCapacite());
@@ -140,27 +140,23 @@ public class TrajetServiceImpl implements TrajetService {
                 .sorted(Comparator.comparingInt(PointArretRequest::ordre))
                 .toList();
 
-        // Vérifier que les ordres forment la séquence exacte 0, 1, 2, ...
         for (int i = 0; i < sorted.size(); i++) {
             if (sorted.get(i).ordre() != i) {
                 throw new BadRequestException("Les ordres des points d'arrêt doivent être séquentiels à partir de 0 (0, 1, 2...).");
             }
         }
 
-        // Vérifier que le départ est dans le futur
         PointArretRequest premierPoint = sorted.get(0);
         if (!premierPoint.heureDePassage().isAfter(LocalDateTime.now())) {
             log.warn("Publication trajet refusée : heure de départ dans le passé ({})", premierPoint.heureDePassage());
             throw new BadRequestException("L'heure de départ du trajet doit être dans le futur.");
         }
 
-        // Vérifier que le prix du premier point vaut 0
         if (premierPoint.prix().compareTo(BigDecimal.ZERO) != 0) {
             log.warn("Publication trajet refusée : prix initial différent de 0 ({})", premierPoint.prix());
             throw new BadRequestException("Le prix depuis le départ doit être égal à 0 au premier point d'arrêt.");
         }
 
-        // Vérifier l'unicité des villes, heures strictement croissantes et prix strictement croissants
         Set<String> villesVues = new HashSet<>();
         villesVues.add(premierPoint.ville().trim().toLowerCase());
 
