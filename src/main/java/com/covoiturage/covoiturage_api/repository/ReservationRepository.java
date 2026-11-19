@@ -1,11 +1,14 @@
 package com.covoiturage.covoiturage_api.repository;
 
 import com.covoiturage.covoiturage_api.entity.Reservation;
+import com.covoiturage.covoiturage_api.enums.StatutReservation;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
@@ -14,4 +17,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     @Query("SELECT r FROM Reservation r JOIN FETCH r.passager JOIN FETCH r.trajet WHERE r.trajet.id = :trajetId ORDER BY r.dateReservation DESC")
     List<Reservation> findByTrajetId(@Param("trajetId") Long trajetId);
+
+    @Query("SELECT r FROM Reservation r JOIN FETCH r.passager JOIN FETCH r.trajet t LEFT JOIN FETCH t.reservations WHERE r.id = :id")
+    Optional<Reservation> findDetailById(@Param("id") Long id);
+
+    boolean existsByPassagerIdAndTrajetIdAndStatut(Long passagerId, Long trajetId, StatutReservation statut);
 }

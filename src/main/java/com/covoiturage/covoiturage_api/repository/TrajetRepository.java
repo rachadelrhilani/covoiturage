@@ -20,6 +20,7 @@ public interface TrajetRepository extends JpaRepository<Trajet, Long> {
             JOIN FETCH t.conducteur
             JOIN FETCH t.vehicule
             LEFT JOIN FETCH t.pointsArret
+            LEFT JOIN FETCH t.reservations
             WHERE t.id = :id
             """)
     Optional<Trajet> findDetailById(@Param("id") Long id);
