@@ -8,6 +8,7 @@ import com.covoiturage.covoiturage_api.entity.Conducteur;
 import com.covoiturage.covoiturage_api.entity.PointArret;
 import com.covoiturage.covoiturage_api.entity.Trajet;
 import com.covoiturage.covoiturage_api.entity.Vehicule;
+import com.covoiturage.covoiturage_api.enums.StatutReservation;
 import com.covoiturage.covoiturage_api.enums.StatutTrajet;
 import com.covoiturage.covoiturage_api.exception.AccessDeniedActionException;
 import com.covoiturage.covoiturage_api.exception.BadRequestException;
@@ -22,10 +23,14 @@ import com.covoiturage.covoiturage_api.repository.VehiculeRepository;
 import com.covoiturage.covoiturage_api.service.TrajetService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -186,5 +191,52 @@ public class TrajetServiceImpl implements TrajetService {
         }
 
         return sorted;
+    }
+
+
+    @Override
+    public Page<TrajetResponse> rechercherTrajets(
+            String villeDepart,
+            String villeArrivee,
+            LocalDate date,
+            BigDecimal prixMax,
+            Integer nbPlaces,
+            Pageable pageable) {
+
+        int placesDemandees = (nbPlaces != null && nbPlaces > 0) ? nbPlaces : 1;
+        LocalDateTime debutJour = date.atStartOfDay();
+        LocalDateTime finJour = date.plusDays(1).atStartOfDay();
+
+        log.info("Recherche de trajets : {} -> {} le {} (places >= {}, prixMax={})",
+                villeDepart, villeArrivee, date, placesDemandees, prixMax);
+
+        Page<Trajet> trajetsPage = trajetRepository.searchTrajets(
+                villeDepart.trim(),
+                villeArrivee.trim(),
+                debutJour,
+                finJour,
+                prixMax,
+                placesDemandees,
+                StatutTrajet.PUBLIE,
+                StatutReservation.CONFIRMEE,
+                pageable
+        );
+
+        return trajetsPage.map(trajet -> {
+            BigDecimal prixMontee = trajet.getPointsArret().stream()
+                    .filter(p -> p.getVille().equalsIgnoreCase(villeDepart.trim()))
+                    .map(PointArret::getPrix)
+                    .findFirst()
+                    .orElse(BigDecimal.ZERO);
+
+            BigDecimal prixDescente = trajet.getPointsArret().stream()
+                    .filter(p -> p.getVille().equalsIgnoreCase(villeArrivee.trim()))
+                    .map(PointArret::getPrix)
+                    .findFirst()
+                    .orElse(BigDecimal.ZERO);
+
+            BigDecimal prixSegment = prixDescente.subtract(prixMontee).setScale(2, java.math.RoundingMode.HALF_UP);
+            return trajetMapper.toResponseWithSegmentPrice(trajet, prixSegment);
+        });
     }
 }
