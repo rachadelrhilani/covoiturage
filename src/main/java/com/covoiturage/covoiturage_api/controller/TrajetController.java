@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,5 +42,20 @@ public class TrajetController {
             @PathVariable Long id,
             @RequestParam Long conducteurId) {
         return ResponseEntity.ok(trajetService.consulterReservationsTrajet(id, conducteurId));
+    }
+
+    @GetMapping("/recherche")
+    @Operation(summary = "Rechercher des trajets multi-étapes disponibles avec pagination")
+    public ResponseEntity<Page<TrajetResponse>> rechercherTrajets(
+            @RequestParam String villeDepart,
+            @RequestParam String villeArrivee,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
+            @RequestParam(required = false) java.math.BigDecimal prixMax,
+            @RequestParam(defaultValue = "1") Integer nbPlaces,
+            @org.springframework.data.web.PageableDefault(size = 10, sort = "dateDepart") org.springframework.data.domain.Pageable pageable) {
+
+        return ResponseEntity.ok(
+                trajetService.rechercherTrajets(villeDepart, villeArrivee, date, prixMax, nbPlaces, pageable)
+        );
     }
 }
