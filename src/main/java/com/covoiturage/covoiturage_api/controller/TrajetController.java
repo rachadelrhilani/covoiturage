@@ -64,4 +64,21 @@ public class TrajetController {
         return ResponseEntity.ok(
                 trajetService.rechercherTrajets(villeDepart, villeArrivee, date, prixMax, nbPlaces, pageable));
     }
+
+
+    @PatchMapping("/{id}/terminer")
+    @Operation(summary = "Marquer un trajet comme terminé (après son heure de départ)")
+    public ResponseEntity<TrajetResponse> terminerTrajet(
+            @PathVariable Long id,
+            @RequestParam Long conducteurId) {
+        return ResponseEntity.ok(trajetService.terminerTrajet(id, conducteurId));
+    }
+
+    @PatchMapping("/{id}/annuler")
+    @Operation(summary = "Annuler un trajet et toutes ses réservations confirmées")
+    public ResponseEntity<TrajetResponse> annulerTrajet(
+            @PathVariable Long id,
+            @RequestParam Long conducteurId) {
+        return ResponseEntity.ok(trajetService.annulerTrajet(id, conducteurId));
+    }
 }

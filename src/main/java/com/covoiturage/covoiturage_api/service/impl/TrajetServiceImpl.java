@@ -8,9 +8,11 @@ import com.covoiturage.covoiturage_api.entity.Conducteur;
 import com.covoiturage.covoiturage_api.entity.PointArret;
 import com.covoiturage.covoiturage_api.entity.Trajet;
 import com.covoiturage.covoiturage_api.entity.Vehicule;
+import com.covoiturage.covoiturage_api.enums.StatutReservation;
 import com.covoiturage.covoiturage_api.enums.StatutTrajet;
 import com.covoiturage.covoiturage_api.exception.AccessDeniedActionException;
 import com.covoiturage.covoiturage_api.exception.BadRequestException;
+import com.covoiturage.covoiturage_api.exception.BusinessRuleException;
 import com.covoiturage.covoiturage_api.exception.ResourceNotFoundException;
 import com.covoiturage.covoiturage_api.mapper.PointArretMapper;
 import com.covoiturage.covoiturage_api.mapper.ReservationMapper;
@@ -65,7 +67,8 @@ public class TrajetServiceImpl implements TrajetService {
         }
 
         if (request.placesPropose() < 1 || request.placesPropose() > vehicule.getCapacite()) {
-            log.warn("Places proposées ({}) invalides pour capacité ({})", request.placesPropose(), vehicule.getCapacite());
+            log.warn("Places proposées ({}) invalides pour capacité ({})", request.placesPropose(),
+                    vehicule.getCapacite());
             throw new BadRequestException("Places proposées invalides (max : " + vehicule.getCapacite() + ").");
         }
 
@@ -218,5 +221,61 @@ public class TrajetServiceImpl implements TrajetService {
 
             return trajetMapper.toResponseWithSegmentPrice(trajet, prixSegment);
         });
+    }
+
+    @Override
+    @Transactional
+    public TrajetResponse terminerTrajet(Long trajetId, Long conducteurId) {
+        Trajet trajet = trouverTrajetConducteur(trajetId, conducteurId);
+
+        if (trajet.getStatut() != StatutTrajet.PUBLIE && trajet.getStatut() != StatutTrajet.COMPLET) {
+            throw new BusinessRuleException("Impossible de terminer un trajet avec le statut : " + trajet.getStatut());
+        }
+
+        if (!LocalDateTime.now().isAfter(trajet.getDateDepart())) {
+            log.warn("Terminaison trajet {} refusée : heure de départ ({}) non atteinte", trajetId,
+                    trajet.getDateDepart());
+            throw new BusinessRuleException("Un trajet ne peut être terminé qu'après son heure de départ.");
+        }
+
+        trajet.setStatut(StatutTrajet.TERMINE);
+        log.info("Trajet terminé avec succès : id={}, conducteurId={}", trajetId, conducteurId);
+
+        return trajetMapper.toResponse(trajet);
+    }
+
+    @Override
+    @Transactional
+    public TrajetResponse annulerTrajet(Long trajetId, Long conducteurId) {
+        Trajet trajet = trouverTrajetConducteur(trajetId, conducteurId);
+
+        if (trajet.getStatut() != StatutTrajet.PUBLIE && trajet.getStatut() != StatutTrajet.COMPLET) {
+            throw new BusinessRuleException("Impossible d'annuler un trajet avec le statut : " + trajet.getStatut());
+        }
+
+        trajet.setStatut(StatutTrajet.ANNULE);
+
+       
+        long nbAnnulees = trajet.getReservations().stream()
+                .filter(r -> r.getStatut() == StatutReservation.CONFIRMEE)
+                .peek(r -> r.setStatut(StatutReservation.ANNULEE))
+                .count();
+
+        log.info("Trajet annulé : id={}, conducteurId={}, {} réservation(s) annulée(s) en cascade",
+                trajetId, conducteurId, nbAnnulees);
+
+        return trajetMapper.toResponse(trajet);
+    }
+
+    private Trajet trouverTrajetConducteur(Long trajetId, Long conducteurId) {
+        Trajet trajet = trajetRepository.findDetailById(trajetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trajet introuvable : " + trajetId));
+
+        if (!trajet.getConducteur().getId().equals(conducteurId)) {
+            log.warn("Action refusée sur trajet {} : conducteur {} non propriétaire", trajetId, conducteurId);
+            throw new AccessDeniedActionException("Vous ne pouvez gérer que vos propres trajets.");
+        }
+
+        return trajet;
     }
 }

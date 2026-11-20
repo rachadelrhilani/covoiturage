@@ -16,6 +16,10 @@ public interface TrajetService {
 
     TrajetResponse consulterTrajet(Long id);
 
+    TrajetResponse terminerTrajet(Long trajetId, Long conducteurId);
+
+    TrajetResponse annulerTrajet(Long trajetId, Long conducteurId);
+
     List<ReservationResponse> consulterReservationsTrajet(Long trajetId, Long conducteurId);
 
 
